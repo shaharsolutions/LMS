@@ -1,5 +1,5 @@
-import { initRouter } from './router.js'
-import { checkAuth } from './auth.js'
+import { initRouter } from './src/router.js'
+import { checkAuth } from './src/auth.js'
 
 document.addEventListener('DOMContentLoaded', async () => {
   const appContainer = document.getElementById('app')
