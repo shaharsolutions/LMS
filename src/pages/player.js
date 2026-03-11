@@ -43,7 +43,8 @@ export default async function renderPlayer(container) {
       startTime: Date.now(),
       suspendData: existingProgress?.suspend_data || '',
       location: existingProgress?.lesson_location || '',
-      lastSync: 0
+      lastSync: 0,
+      isExiting: false
     };
 
     console.warn(`[LMS] Initial State for ${courseId}: Status=${runtime.status}, Location="${runtime.location}", Progress=${runtime.progress}%`);
@@ -84,6 +85,27 @@ export default async function renderPlayer(container) {
     window._lmsHeartbeat = setInterval(() => {
         syncProgress("heartbeat").catch(() => {});
     }, 20000);
+
+    const handleExit = async (label = "exit") => {
+      if (runtime.isExiting) return;
+      runtime.isExiting = true;
+
+      const saveBtn = document.getElementById('scorm-save-exit');
+      if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'מתנתק...';
+      }
+
+      if (window._lmsHeartbeat) clearInterval(window._lmsHeartbeat);
+      
+      try {
+        await syncProgress(label);
+      } catch (e) {
+        console.error("[LMS] Exit sync failed:", e);
+      } finally {
+        window.history.back();
+      }
+    };
 
     const API = {
       _initialized: false,
@@ -162,8 +184,8 @@ export default async function renderPlayer(container) {
       LMSCommit: () => API.Commit(),
       
       Finish: () => { 
-          console.warn("[LMS] SCORM Finish called");
-          syncProgress("exit").catch(() => {}); 
+          console.warn("[LMS] SCORM Finish called - exiting");
+          handleExit("scorm_finish");
           return "true"; 
       },
       LMSFinish: () => API.Finish(),
@@ -238,11 +260,8 @@ export default async function renderPlayer(container) {
     };
 
     document.getElementById('scorm-save-exit').addEventListener('click', async () => { 
-        document.getElementById('scorm-save-exit').disabled = true;
-        document.getElementById('scorm-save-exit').textContent = 'שומר...';
         try { iframe.contentWindow.dispatchEvent(new Event('unload')); } catch(e) {}
-        await syncProgress("manual_exit");
-        window.history.back();
+        await handleExit("manual_exit");
     });
 
   } catch (err) { container.innerHTML = `<div class="p-8 text-center text-danger">${err.message}</div>`; }

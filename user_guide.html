@@ -164,6 +164,16 @@
             -webkit-text-fill-color: transparent;
         }
 
+        h2 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin: 2rem 0 1rem;
+            color: var(--text-dark);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
         .subtitle {
             font-size: 1.2rem;
             color: var(--text-muted);
@@ -260,10 +270,26 @@
             box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3);
         }
 
+        .step-content {
+            flex: 1;
+        }
+
         .step-content h4 {
             font-size: 1.2rem;
             margin-bottom: 8px;
             font-weight: 700;
+            color: var(--primary);
+        }
+
+        .step-content p {
+            line-height: 1.6;
+            color: var(--text-muted);
+        }
+
+        .step-content ul {
+            margin-top: 10px;
+            padding-right: 20px;
+            color: var(--text-muted);
         }
 
         /* Tips */
@@ -299,6 +325,17 @@
             right: 0;
             color: var(--success);
             font-weight: bold;
+        }
+
+        .badge-info {
+            background: var(--primary-light);
+            color: var(--primary);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            display: inline-block;
+            margin-bottom: 10px;
         }
 
         /* Responsive */
@@ -374,31 +411,124 @@
                 <div class="card">
                     <div class="card-icon"><i class='bx bx-mobile-alt'></i></div>
                     <h3>נגישות מלאה</h3>
-                    <p>המערכת מותאמת באופן מלא לעבודה מכל מכשיר - מחשב, טאבלט או סמארטפון, ומאפשרת למידה מכל מקום.</p>
+                    <p>המערכת מותאמת באופן מלא לעבודה מכל מכשיר - מחשב, טאבלט או סמארטפון, ומאפשרות למידה מכל מקום.</p>
                 </div>
             </div>
         </section>
 
         <!-- Section: Manager -->
         <section id="manager" class="section">
-            <h1>מדריך למנהלי הדרכה</h1>
-            <p class="subtitle">ניהול משתמשים, הקצאת תכנים והפקת דוחות ביצועים.</p>
+            <h1>מדריך מקיף למנהלי הדרכה</h1>
+            <p class="subtitle">ניהול משתמשים, הקצאת תכנים, ניהול קבוצות והפקת דוחות ביצועים מתקדמים.</p>
 
-            <div class="grid">
+            <!-- Chapter 1: Courses -->
+            <h2><i class='bx bx-cloud-upload'></i> 1. ניהול והעלאת לומדות (SCORM)</h2>
+            <p class="text-muted mb-4">תהליך העלאת תכני למידה למערכת ופרסומם ללומדים.</p>
+            
+            <div class="steps-container">
+                <div class="step-item">
+                    <div class="step-count">1</div>
+                    <div class="step-content">
+                        <h4>הכנת הקובץ</h4>
+                        <p>וודאו שהלומדה מיוצאת כקובץ **ZIP** תואם תקן SCORM (1.2 או 2004). המערכת תזהה אוטומטית את קובץ המניפסט (imsmanifest.xml).</p>
+                    </div>
+                </div>
+                <div class="step-item">
+                    <div class="step-count">2</div>
+                    <div class="step-content">
+                        <h4>מילוי פרטי הלומדה</h4>
+                        <p>במסך "ניהול לומדות", הזינו את שם הלומדה, תיאור קצר (יוצג ללומדים) ובחרו קטגוריה רלוונטית (לדוגמה: אבטחת מידע, משאבי אנוש).</p>
+                    </div>
+                </div>
+                <div class="step-item">
+                    <div class="step-count">3</div>
+                    <div class="step-content">
+                        <h4>העלאה ופרסום</h4>
+                        <p>לחצו על "העלה ופרסם". המערכת תפרק את הקובץ, תשמור את המשאבים בענן ותהפוך את הלומדה לזמינה להקצאה.</p>
+                        <ul class="text-sm">
+                            <li>ניתן לצפות בתצוגה מקדימה לפני ההקצאה ע"י לחיצה על כפתור ה-Play.</li>
+                            <li>במידה והלומדה עודכנה, יש למחוק את הישנה ולהעלות גרסה חדשה.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chapter 2: Groups -->
+            <h2><i class='bx bx-group'></i> 2. ניהול קבוצות למידה</h2>
+            <p class="text-muted mb-4">קבוצות הן הכלי היעיל ביותר לניהול למידה מחלקתית או נושאית.</p>
+
+            <div class="steps-container">
+                <div class="step-item">
+                    <div class="step-count">1</div>
+                    <div class="step-content">
+                        <h4>יצירת קבוצה</h4>
+                        <p>הזינו שם לקבוצה (לדוגמה: "צוות מכירות", "הנהלה") ולחצו על "צור קבוצה".</p>
+                    </div>
+                </div>
+                <div class="step-item">
+                    <div class="step-count">2</div>
+                    <div class="step-content">
+                        <h4>שיוך עובדים לקבוצה</h4>
+                        <p>לחצו על כפתור הניהול (גלגל שיניים) ליד שם הקבוצה. תחת "עובדים בקבוצה", לחצו על "הוסף עובד" ובחרו את העובדים הרצויים מהרשימה הארגונית.</p>
+                    </div>
+                </div>
+                <div class="step-item">
+                    <div class="step-count">3</div>
+                    <div class="step-content">
+                        <h4>הקצאת לומדות לקבוצה</h4>
+                        <p>באותו מסך ניהול קבוצה, תחת "לומדות שהוקצו", לחצו על "הקצה לומדה". כל עובד שמשוייך לקבוצה זו יקבל אוטומטית את הלומדה ללוח הלמידה שלו.</p>
+                        <div class="badge-info mt-2">טיפ: שיוך עובד חדש לקבוצה קיימת יקצה לו באופן אוטומטי את כל הלומדות המשוייכות לקבוצה.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chapter 3: Users -->
+            <h2><i class='bx bx-user-plus'></i> 3. ניהול עובדים (משתמשים)</h2>
+            <p class="text-muted mb-4">יצירה, עריכה וניהול הרשאות של הלומדים בארגון.</p>
+
+            <div class="steps-container">
+                <div class="step-item">
+                    <div class="step-count">1</div>
+                    <div class="step-content">
+                        <h4>יצירת משתמש בודד</h4>
+                        <p>הזינו שם מלא, אימייל, טלפון וסיסמה ראשונית. בחרו תפקיד: **לומד** (גישה לתכנים בלבד) או **מנהל הדרכה** (גישה לממשק הניהול).</p>
+                    </div>
+                </div>
+                <div class="step-item">
+                    <div class="step-count">2</div>
+                    <div class="step-content">
+                        <h4>פעולות קבוצתיות (Bulk Actions)</h4>
+                        <p>ניתן לסמן מספר משתמשים בטבלה ולבצע פעולות משותפות כגון: שיוך קבוצתי לקבוצה, מחיקה קבוצתית או העברה בין ארגונים.</p>
+                    </div>
+                </div>
+                <div class="step-item">
+                    <div class="step-count">3</div>
+                    <div class="step-content">
+                        <h4>איפוס נתונים וסיסמאות</h4>
+                        <p>ניתן לאפס סיסמה ע"י עריכת המשתמש. כמו כן, ניתן לאפס את התקדמות הלמידה של עובד ספציפי (לביצוע הדרכה חוזרת) או לאפס את כלל הנתונים הארגוניים במכה אחת.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chapter 4: Reports -->
+            <h2><i class='bx bx-line-chart'></i> 4. דוחות ומעקב למידה</h2>
+            <p class="text-muted mb-4">ניתוח נתונים בזמן אמת וייצוא לצורך בקרה ארגונית.</p>
+
+            <div class="grid" style="margin-top: 1rem;">
                 <div class="card">
-                    <div class="card-icon"><i class='bx bx-group'></i></div>
-                    <h3>ניהול עובדים</h3>
-                    <p>הוספת עובדים חדשים, ניהול מחלקות ואיפוס סיסמאות בקלות דרך ממשק הניהול של הארגון.</p>
+                    <div class="card-icon"><i class='bx bx-pie-chart-alt'></i></div>
+                    <h3>סטטיסטיקה חיה</h3>
+                    <p>צפו בכמות הלומדים הפעילים, אחוז ההשלמות וזמן הלמידה הממוצע ברמת הארגון או הקבוצה.</p>
                 </div>
                 <div class="card">
-                    <div class="card-icon"><i class='bx bx-upload'></i></div>
-                    <h3>העלאת תכנים</h3>
-                    <p>העלאת קבצי ZIP של לומדות. המערכת מפרקת ומאנדקסת את קבצי ה-SCORM באופן אוטומטי.</p>
+                    <div class="card-icon"><i class='bx bx-export'></i></div>
+                    <h3>ייצוא נתונים</h3>
+                    <p>ייצאו דוחות מפורטים בפורמט **Excel**, **CSV** או **PDF**. הדוח כולל שמות, ציונים, סטטוסי התקדמות ותאריכי סיום.</p>
                 </div>
                 <div class="card">
-                    <div class="card-icon"><i class='bx bx-line-chart'></i></div>
-                    <h3>ניתוח נתונים</h3>
-                    <p>דוחות התקדמות בזמן אמת - מי התחיל, מי סיים, ציונים ממוצעים וזמן שהושקע בכל פרק למידה.</p>
+                    <div class="card-icon"><i class='bx bx-edit-alt'></i></div>
+                    <h3>ניהול ידני</h3>
+                    <p>למנהלים יש הרשאה לערוך ידנית סטטוסי התקדמות או ציונים במקרים חריגים דרך כפתור העריכה בטבלת המעקב.</p>
                 </div>
             </div>
         </section>
@@ -450,6 +580,24 @@
                     </ul>
                 </div>
             </div>
+
+            <div class="card mt-6" style="background: white;">
+                <h3>שאלות נפוצות (FAQ)</h3>
+                <div style="margin-top: 1.5rem;">
+                    <details style="margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
+                        <summary style="font-weight: 700; cursor: pointer; color: var(--primary);">הלומדה לא נפתחת לי, מה עושים?</summary>
+                        <p style="padding: 10px 0; color: var(--text-muted);">וודאו שאין חוסם פופ-אפים (Pop-up Blocker) מופעל בדפדפן. הלומדות נפתחות בחלון חדש ומאובטח.</p>
+                    </details>
+                    <details style="margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
+                        <summary style="font-weight: 700; cursor: pointer; color: var(--primary);">האם המערכת עובדת בטלפון הנייד?</summary>
+                        <p style="padding: 10px 0; color: var(--text-muted);">כן, המערכת רספונסיבית לחלוטין. עם זאת, איכות הלמידה תלויה גם באופן שבו הלומדה עצמה עוצבה ע"י התוכן.</p>
+                    </details>
+                    <details style="margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
+                        <summary style="font-weight: 700; cursor: pointer; color: var(--primary);">סיימתי את הלומדה וזה עדיין מראה 90%, מדוע?</summary>
+                        <p style="padding: 10px 0; color: var(--text-muted);">סביר להניח שחלפתם על פני שקופית אחת או שלא עניתם על שאלת תרגול. חזרו ללומדה וודאו שעברתם על כל התכנים.</p>
+                    </details>
+                </div>
+            </div>
         </section>
 
         <footer style="margin-top: 5rem; padding: 2rem 0; border-top: 1px solid var(--border-color); color: var(--text-muted); text-align: center;">
@@ -466,7 +614,10 @@
             
             // Update nav active class
             document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-            event.currentTarget.classList.add('active');
+            
+            // Find the link that has the onclick with this id
+            const targetLink = Array.from(document.querySelectorAll('.nav-link')).find(l => l.getAttribute('onclick').includes(id));
+            if(targetLink) targetLink.classList.add('active');
             
             // Scroll to top
             window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -476,10 +627,12 @@
             let input = document.getElementById('searchInput').value.toLowerCase();
             let cards = document.querySelectorAll('.card');
             let steps = document.querySelectorAll('.step-item');
+            let headers = document.querySelectorAll('h2');
 
             if (input === "") {
                 cards.forEach(c => c.style.display = 'block');
                 steps.forEach(s => s.style.display = 'flex');
+                headers.forEach(h => h.style.display = 'flex');
                 return;
             }
 
@@ -491,6 +644,11 @@
             steps.forEach(step => {
                 let text = step.innerText.toLowerCase();
                 step.style.display = text.includes(input) ? 'flex' : 'none';
+            });
+
+            headers.forEach(h => {
+                let text = h.innerText.toLowerCase();
+                h.style.display = text.includes(input) ? 'flex' : 'none';
             });
         }
     </script>
