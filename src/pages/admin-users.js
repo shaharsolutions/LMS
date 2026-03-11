@@ -4,6 +4,7 @@ import { fetchGroups, assignUsersToGroup } from '../api/groupsApi.js'
 import { getCurrentUserSync } from '../api/authApi.js'
 import { showConfirmModal, showToast, showBulkGroupModal, showBulkOrgModal } from '../lib/ui.js'
 import { fetchOrganizations } from '../api/orgApi.js'
+import * as XLSX from 'xlsx'
 
 export default async function renderAdminUsers(container) {
   const currentUser = getCurrentUserSync();
@@ -81,82 +82,108 @@ export default async function renderAdminUsers(container) {
       </div>
     </div>
 
-    <div class="grid grid-cols-3 slide-up" style="gap: 1.5rem; align-items: start;">
-       <!-- Add User Form Section -->
-       <div class="card" style="grid-column: span 1;">
-         <h3 class="mb-3" id="form-title">יצירת משתמש חדש</h3>
-         <form id="user-create-form">
-            <div class="form-group" style="text-align: right;">
-               <label class="form-label" for="user-name">שם מלא <span style="color: hsl(var(--color-danger));">*</span></label>
-               <input class="form-control" type="text" id="user-name" required placeholder="לדוגמה: משה כהן">
+    <div class="grid grid-cols-12 slide-up" style="gap: 2rem; align-items: start;">
+       <!-- Add User Section (Top Full Width) -->
+       <div class="card" style="grid-column: span 12; box-shadow: 0 10px 25px -10px hsla(var(--color-primary), 0.1); border: 1px solid hsla(var(--color-primary), 0.08);">
+         <h3 class="mb-4" id="form-title" style="font-size: 1.1rem; border-bottom: 1px solid hsla(var(--text-main), 0.05); padding-bottom: 0.75rem;"><i class='bx bx-user-plus'></i> יצירת משתמש חדש</h3>
+         <form id="user-create-form" class="flex flex-wrap items-end" style="gap: 2px;">
+            <div class="form-group" style="text-align: right; margin-bottom: 0; flex: 1; min-width: 240px;">
+               <label class="form-label" for="user-name" style="font-size: 0.85rem; margin-bottom: 0.2rem;">שם מלא <span style="color: hsl(var(--color-danger));">*</span></label>
+               <input class="form-control" type="text" id="user-name" required placeholder="לדוגמה: משה כהן" style="height: 42px; padding-top: 0; padding-bottom: 0;">
             </div>
-            <div class="form-group" style="text-align: right;">
-               <label class="form-label" for="user-email">כתובת אימייל <span style="color: hsl(var(--color-danger));">*</span></label>
-               <input class="form-control" type="email" id="user-email" required placeholder="moshe@company.com">
+            <div class="form-group" style="text-align: right; margin-bottom: 0; flex: 1; min-width: 240px;">
+               <label class="form-label" for="user-email" style="font-size: 0.85rem; margin-bottom: 0.2rem;">כתובת אימייל <span style="color: hsl(var(--color-danger));">*</span></label>
+               <input class="form-control" type="email" id="user-email" required placeholder="moshe@company.com" style="height: 42px; padding-top: 0; padding-bottom: 0;">
             </div>
-            <div class="form-group" style="text-align: right;">
-               <label class="form-label" for="user-phone">מספר טלפון</label>
-               <input class="form-control" type="tel" id="user-phone" placeholder="050-0000000">
+            <div class="form-group" style="text-align: right; margin-bottom: 0; flex: 1; min-width: 200px;">
+               <label class="form-label" for="user-phone" style="font-size: 0.85rem; margin-bottom: 0.2rem;">מספר טלפון</label>
+               <input class="form-control" type="tel" id="user-phone" placeholder="050-0000000" style="height: 42px; padding-top: 0; padding-bottom: 0;">
             </div>
-            <div class="form-group" style="text-align: right;">
-               <label class="form-label" for="user-password">סיסמה לעובד <span style="color: hsl(var(--color-danger));">*</span></label>
-               <input class="form-control" type="text" id="user-password" required placeholder="לפחות 6 תווים">
+            <div class="form-group" style="text-align: right; margin-bottom: 0; flex: 1; min-width: 200px;">
+               <label class="form-label" for="user-password" style="font-size: 0.85rem; margin-bottom: 0.2rem;">סיסמה לעובד <span style="color: hsl(var(--color-danger));">*</span></label>
+               <input class="form-control" type="text" id="user-password" required placeholder="לפחות 6 תווים" style="height: 42px; padding-top: 0; padding-bottom: 0;">
             </div>
             
             ${isSuperAdmin ? `
-            <div class="form-group" style="text-align: right;">
-               <label class="form-label" for="user-org">שיוך לארגון</label>
-               <select class="form-control" id="user-org">
+            <div class="form-group" style="text-align: right; margin-bottom: 0; flex: 1; min-width: 200px;">
+               <label class="form-label" for="user-org" style="font-size: 0.85rem; margin-bottom: 0.2rem;">שיוך לארגון</label>
+               <select class="form-control" id="user-org" style="height: 42px; padding-top: 0; padding-bottom: 0;">
                   <option value="">-- בחר ארגון --</option>
                   ${organizations.map(o => `<option value="${o.id}">${o.name}</option>`).join('')}
                </select>
             </div>
             ` : ''}
 
-            <div class="form-group" style="text-align: right;">
-               <label class="form-label" for="user-role">תפקיד במערכת</label>
-               <select class="form-control" id="user-role">
+            <div class="form-group" style="text-align: right; margin-bottom: 0; flex: 1; min-width: 200px;">
+               <label class="form-label" for="user-role" style="font-size: 0.85rem; margin-bottom: 0.2rem;">תפקיד במערכת</label>
+               <select class="form-control" id="user-role" style="height: 42px; padding-top: 0; padding-bottom: 0;">
                   <option value="learner">לומד (Learner)</option>
                   <option value="org_admin">מנהל הדרכה (Admin)</option>
                </select>
             </div>
             
-            <button type="submit" class="btn btn-primary w-full justify-center mt-4" id="submit-btn" style="transition: all 0.3s ease;">
-              <i class='bx bx-user-plus'></i> <span>צור חשבון ושגר הזמנה</span>
-            </button>
-            <button type="button" class="btn btn-outline w-full justify-center mt-2 hidden" id="cancel-edit-btn">
-              ביטול עריכה
-            </button>
-            <div id="user-msg" style="margin-top: 10px; text-align: center; font-weight: 500; min-height: 20px;" class="text-sm"></div>
+            <div style="display: flex; flex-direction: column; gap: 2px; margin-bottom: 0;">
+              <button type="submit" class="btn btn-primary" id="submit-btn" style="height: 42px; padding: 0 1.5rem; font-weight: 600; white-space: nowrap;">
+                <i class='bx bx-user-plus' style="font-size: 1.1rem;"></i> <span>צור חשבון</span>
+              </button>
+              <button type="button" class="btn btn-outline hidden" id="cancel-edit-btn" style="height: 42px; white-space: nowrap; padding: 0 1.5rem;">
+                ביטול
+              </button>
+            </div>
+            <div id="user-msg" style="margin-top: 5px; text-align: center; font-weight: 500; min-height: 20px; width: 100%;" class="text-xs"></div>
          </form>
        </div>
 
-       <!-- Table Section -->
-       <div class="card table-wrapper" style="grid-column: span 2;">
-          <div class="flex justify-between items-center mb-3">
-             <h3 class="m-0">רשימת משתמשים פעילים</h3>
+       <!-- Table Section (Primary) -->
+       <div class="card table-wrapper" style="grid-column: span 8; height: 100%;">
+          <div class="flex justify-between items-center mb-6">
+             <div>
+               <h3 class="m-0" style="font-size: 1.25rem;">רשימת משתמשים פעילים</h3>
+               <p class="text-xs text-muted">ניהול ומעקב אחר כלל המשתמשים המשוייכים למערכת</p>
+             </div>
              ${!isSuperAdmin ? `
-             <button class="btn btn-outline text-sm" id="reset-all-org-progress" style="color: hsl(var(--color-danger)); border-color: hsla(var(--color-danger), 0.3);">
-                <i class='bx bx-refresh'></i> איפוס כלל הנתונים בארגון
+             <button class="btn btn-outline text-sm" id="reset-all-org-progress" style="color: hsl(var(--color-danger)); border-color: hsla(var(--color-danger), 0.3); padding: 0.5rem 1rem;">
+                <i class='bx bx-refresh'></i> איפוס נתוני ארגון
              </button>
              ` : ''}
           </div>
-         <table class="table" id="users-table">
-            <thead>
-                <tr>
-                   <th style="width: 40px;"><input type="checkbox" id="select-all-users"></th>
-                   <th>שם מלא</th>
-                   <th>אימייל / הרשאה</th>
-                   ${isSuperAdmin ? '<th>ארגון</th>' : ''}
-                   <th>סטטוס</th>
-                   <th>תאריך הצטרפות</th>
-                   <th>פעולות</th>
-                </tr>
-            </thead>
-            <tbody>
-               <tr><td colspan="${isSuperAdmin ? 7 : 6}" style="text-align: center;"><i class='bx bx-loader bx-spin'></i> טוען משתמשים...</td></tr>
-            </tbody>
-         </table>
+         <div style="overflow-x: auto;">
+           <table class="table" id="users-table">
+              <thead>
+                  <tr>
+                     <th style="width: 40px; padding: 1rem;"><input type="checkbox" id="select-all-users"></th>
+                     <th style="padding: 1rem;">שם מלא</th>
+                     <th style="padding: 1rem;">פרטי קשר</th>
+                     ${isSuperAdmin ? '<th style="padding: 1rem;">ארגון</th>' : ''}
+                     <th style="padding: 1rem;">סטטוס</th>
+                     <th style="padding: 1rem; width: 120px;">הצטרפות</th>
+                     <th style="padding: 1rem; text-align: left;">פעולות</th>
+                  </tr>
+              </thead>
+              <tbody>
+                 <tr><td colspan="${isSuperAdmin ? 7 : 6}" style="text-align: center; padding: 3rem;"><i class='bx bx-loader bx-spin' style="font-size: 2rem; color: hsl(var(--color-primary));"></i><br><span class="mt-2 block">טוען משתמשים...</span></td></tr>
+              </tbody>
+           </table>
+         </div>
+       </div>
+
+       <!-- Sidebar Actions Area (Excel Only now) -->
+       <div class="flex flex-col gap-6" style="grid-column: span 4;">
+         <div class="card" style="background: hsla(var(--color-primary), 0.02); border: 1px dashed hsla(var(--color-primary), 0.25);">
+           <h3 class="mb-2" style="font-size: 1.1rem; color: hsl(var(--color-primary));"><i class='bx bx-file-import'></i> יבוא המוני (Excel)</h3>
+           <p class="text-xs text-muted mb-4" style="line-height: 1.4;">הוסף כמות גדולה של עובדים בלחיצת כפתור אחת. פשוט הורד את התבנית, מלא והעלה חזרה.</p>
+           
+           <div class="flex flex-col gap-3">
+             <button class="btn btn-outline btn-sm w-full justify-start" id="download-template-btn" style="background: white; border-color: hsla(var(--color-primary), 0.2); padding: 0.75rem;">
+               <i class='bx bx-download' style="font-size: 1.1rem; color: hsl(var(--color-primary));"></i> <span style="flex-grow: 1;">הורדת תבנית אקסל</span>
+             </button>
+             <button class="btn btn-outline btn-sm w-full justify-start" id="upload-bulk-btn" style="background: white; border-color: hsla(var(--color-primary), 0.2); padding: 0.75rem;">
+               <i class='bx bx-upload' style="font-size: 1.1rem; color: hsl(var(--color-primary));"></i> <span style="flex-grow: 1;">העלאת קובץ ורישום</span>
+             </button>
+             <input type="file" id="bulk-excel-input" accept=".xlsx, .xls" style="display: none;">
+           </div>
+           <div id="bulk-msg" style="margin-top: 15px; text-align: center; font-weight: 500;" class="text-xs"></div>
+         </div>
        </div>
     </div>
   `
@@ -510,4 +537,113 @@ export default async function renderAdminUsers(container) {
       });
     });
   }
+
+  // === Excel Bulk Import/Export Logic ===
+  
+  const bulkInput = container.querySelector('#bulk-excel-input');
+  const bulkMsg = container.querySelector('#bulk-msg');
+
+  container.querySelector('#download-template-btn').addEventListener('click', () => {
+    const headers = [['שם מלא', 'אימייל', 'טלפון', 'סיסמה', 'תפקיד (learner/org_admin)']];
+    if (isSuperAdmin) {
+      headers[0].push('מזהה ארגון (Org ID)');
+    }
+    
+    const worksheet = XLSX.utils.aoa_to_sheet(headers);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'תבנית עובדים');
+    XLSX.writeFile(workbook, 'lms_users_template.xlsx');
+    showToast('התבנית הורדה בהצלחה');
+  });
+
+  container.querySelector('#upload-bulk-btn').addEventListener('click', () => {
+    bulkInput.click();
+  });
+
+  bulkInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    bulkMsg.style.color = 'hsl(var(--text-main))';
+    bulkMsg.innerHTML = `<i class='bx bx-loader-alt bx-spin'></i> קורא קובץ...`;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws);
+
+        if (data.length === 0) {
+          throw new Error('הקובץ ריק או לא בפורמט התקין');
+        }
+
+        bulkMsg.innerHTML = `<i class='bx bx-loader-alt bx-spin'></i> מעבד ${data.length} משתמשים...`;
+        
+        let successCount = 0;
+        let failCount = 0;
+        let errors = [];
+
+        for (const row of data) {
+          try {
+            // Map Hebrew headers to keys
+            const fullName = row['שם מלא'] || row['Full Name'];
+            const email = row['אימייל'] || row['Email'];
+            const phone = row['טלפון'] || row['Phone'];
+            const password = row['סיסמה'] || row['Password'] || 'Lms123456'; // Default password if empty
+            const role = row['תפקיד (learner/org_admin)'] || row['Role'] || 'learner';
+            const orgId = row['מזהה ארגון (Org ID)'] || row['Org ID'];
+
+            if (!fullName || !email) {
+              throw new Error(`חסר שם או אימייל עבור השורה: ${JSON.stringify(row)}`);
+            }
+
+            await createUser({
+              fullName,
+              email,
+              phone: phone ? phone.toString() : '',
+              password: password.toString(),
+              role,
+              orgId: isSuperAdmin ? orgId : currentUser.orgId
+            });
+            successCount++;
+            bulkMsg.innerHTML = `<i class='bx bx-loader-alt bx-spin'></i> מעבד... (${successCount}/${data.length})`;
+          } catch (err) {
+            console.error(`Error creating user from Excel:`, err);
+            failCount++;
+            errors.push(err.message);
+          }
+        }
+
+        if (successCount > 0) {
+          showToast(`${successCount} משתמשים נוספו בהצלחה`);
+          await renderTable();
+        }
+
+        if (failCount > 0) {
+          bulkMsg.style.color = 'hsl(var(--color-danger))';
+          bulkMsg.innerHTML = `הושלם עם שגיאות: ${successCount} הצליחו, ${failCount} נכשלו.`;
+          console.warn('Bulk import errors:', errors);
+        } else {
+          bulkMsg.style.color = 'hsl(var(--color-success))';
+          bulkMsg.innerHTML = `כל ${successCount} המשתמשים נוספו בהצלחה!`;
+          setTimeout(() => { bulkMsg.innerHTML = '' }, 5000);
+        }
+
+      } catch (err) {
+        bulkMsg.style.color = 'hsl(var(--color-danger))';
+        bulkMsg.innerHTML = 'שגיאה: ' + err.message;
+      } finally {
+        bulkInput.value = '';
+      }
+    };
+    reader.onerror = () => {
+      bulkMsg.style.color = 'hsl(var(--color-danger))';
+      bulkMsg.innerHTML = 'שגיאה בקריאת הקובץ';
+      bulkInput.value = '';
+    };
+    reader.readAsBinaryString(file);
+  });
 }
