@@ -380,10 +380,11 @@ export default async function renderAdminUsers(container) {
     const submitBtn = form.querySelector('button[type="submit"]')
     const isEdit = !!form.dataset.editId
     
+    const rawPhone = document.getElementById('user-phone').value.trim();
     const userData = {
-      fullName: document.getElementById('user-name').value,
-      email: document.getElementById('user-email').value,
-      phone: document.getElementById('user-phone').value,
+      fullName: document.getElementById('user-name').value.trim(),
+      email: document.getElementById('user-email').value.trim(),
+      phone: rawPhone,
       password: document.getElementById('user-password').value,
       role: document.getElementById('user-role').value
     }
@@ -398,10 +399,11 @@ export default async function renderAdminUsers(container) {
     }
 
     if (userData.phone) {
-      const phoneRegex = /^05\d-?\d{7}$/;
+      // Allow mobile (05X), landline (02,03,04,08,09) and VOIP (07X)
+      const phoneRegex = /^0(5\d|7\d|[23489])-?\d{7}$/;
       if (!phoneRegex.test(userData.phone)) {
         msg.style.color = 'hsl(var(--color-danger))';
-        msg.innerHTML = 'שגיאה: מספר טלפון לא תקין.';
+        msg.innerHTML = 'שגיאה: מספר טלפון לא תקין (צריך להתחיל ב-0 ולהכיל 9-10 ספרות).';
         setTimeout(() => { msg.innerHTML = '' }, 4000);
         return;
       }
