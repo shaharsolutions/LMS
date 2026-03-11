@@ -1,13 +1,6 @@
 import { getCurrentUserSync as getUser } from './auth.js'
-import renderLogin from './pages/login.js'
-import renderAdminDashboard from './pages/admin.js'
-import renderAdminScorm from './pages/admin-scorm.js'
-import renderAdminAssignments from './pages/admin-assignments.js'
-import renderAdminUsers from './pages/admin-users.js'
-import renderLearnerDashboard from './pages/learner.js'
-import renderPlayer from './pages/player.js'
-import renderSuperAdminOrgs from './pages/superadmin-orgs.js'
 import { renderNavbar } from './components/navbar.js'
+import { getRoute } from './routes.js'
 
 export function initRouter(container) {
   // Listen to hash changes
@@ -16,83 +9,62 @@ export function initRouter(container) {
   navigate(container)
 }
 
-function navigate(container) {
+async function navigate(container) {
   const hash = window.location.hash || '#/'
   const user = getUser()
+  const route = getRoute(hash)
 
-  // Guard: if no user to login
+  // 1. Guard: Authentication
   if (!user && hash !== '#/login') {
     window.location.hash = '#/login'
     return
   }
 
-  // Clear container
+  // 2. Guard: Authorization (Roles)
+  if (route && route.roles) {
+    if (!route.roles.includes(user.role)) {
+      console.warn(`Access Denied to ${hash} for role ${user.role}`)
+      window.location.hash = '#/'
+      return
+    }
+  }
+
+  // 3. Special Case: Already logged in user trying to access Login page
+  if (user && hash === '#/login') {
+    if (user.role === 'super_admin') window.location.hash = '#/superadmin/orgs'
+    else if (user.role === 'org_admin' || user.role === 'admin') window.location.hash = '#/admin'
+    else window.location.hash = '#/learner'
+    return
+  }
+
+  // 4. Handle 404
+  if (!route) {
+    container.innerHTML = '<div class="container mt-4 text-center"><h2>עמוד לא נמצא (404)</h2><a href="#/" class="btn btn-primary mt-2">חזרה לבית</a></div>'
+    return
+  }
+
+  // 5. Clear container and setup layout
   container.innerHTML = ''
   container.className = 'app-container fade-in'
 
-  // Render Navbar if user is logged in
-  if (user) {
-    const nav = renderNavbar(user)
-    container.appendChild(nav)
+  // 6. Layout Management
+  let pageContainer = container;
+  if (route.layout === 'default') {
+      // Navbar + Main Container
+      const nav = renderNavbar(user)
+      container.appendChild(nav)
+
+      const main = document.createElement('main')
+      main.className = 'container mt-4 mb-4 slide-up w-full'
+      container.appendChild(main)
+      pageContainer = main;
   }
 
-  // Main content wrapper
-  const pageContainer = document.createElement('main')
-  pageContainer.className = 'container mt-4 mb-4 slide-up w-full'
-  container.appendChild(pageContainer)
-
-  // Route mapping
-  if (hash === '#/login') {
-    // If user is already logged in, redirect based on role
-    if (user) {
-      if (user.role === 'super_admin') window.location.hash = '#/superadmin/orgs'
-      else if (user.role === 'org_admin' || user.role === 'admin') window.location.hash = '#/admin'
-      else window.location.hash = '#/learner'
-      return
-    }
-    renderLogin(pageContainer)
-  } else if (hash === '#/admin') {
-    // Admin Guard
-    if (user.role !== 'admin' && user.role !== 'org_admin') {
-      window.location.hash = '#/'
-      return
-    }
-    renderAdminDashboard(pageContainer)
-  } else if (hash === '#/admin/scorm') {
-    // Admin SCORM Guard
-    if (user.role !== 'admin' && user.role !== 'org_admin') {
-      window.location.hash = '#/'
-      return
-    }
-    renderAdminScorm(pageContainer)
-  } else if (hash === '#/admin/users') {
-    // Admin Users Guard
-    if (user.role !== 'admin' && user.role !== 'org_admin') {
-      window.location.hash = '#/'
-      return
-    }
-    renderAdminUsers(pageContainer)
-  } else if (hash === '#/admin/assignments') {
-    // Admin Assignments Guard
-    if (user.role !== 'admin' && user.role !== 'org_admin') {
-      window.location.hash = '#/'
-      return
-    }
-    renderAdminAssignments(pageContainer)
-  } else if (hash === '#/superadmin/orgs') {
-    // Super Admin Guard
-    if (user.role !== 'super_admin') {
-      window.location.hash = '#/'
-      return
-    }
-    renderSuperAdminOrgs(pageContainer)
-  } else if (hash === '#/' || hash === '#/learner') {
-    // Both can see learner (Admin maybe as demo)
-    renderLearnerDashboard(pageContainer)
-  } else if (hash.startsWith('#/player')) {
-    // Player Page
-    renderPlayer(pageContainer)
-  } else {
-    pageContainer.innerHTML = '<h2>עמוד לא נמצא (404)</h2>'
+  // 7. Render Route Component
+  try {
+    await route.component(pageContainer)
+  } catch (err) {
+    console.error(`Error rendering route ${hash}:`, err)
+    pageContainer.innerHTML = `<div class="p-8 text-center text-danger"><h3>שגיאה בטעינת העמוד</h3><p>${err.message}</p></div>`
   }
 }

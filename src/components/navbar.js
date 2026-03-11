@@ -8,11 +8,12 @@ export function renderNavbar(user) {
   let linksStr = ''
   if (user.role === 'super_admin') {
     linksStr += `<a href="#/superadmin/orgs" class="nav-link"><i class='bx bx-building-house'></i> ניהול ארגונים</a>`
+    linksStr += `<a href="#/admin/users" class="nav-link"><i class='bx bx-group'></i> ניהול עובדים</a>`
+    linksStr += `<a href="#/superadmin/assignments" class="nav-link"><i class='bx bx-link'></i> הקצאת לומדות</a>`
   } else if (user.role === 'admin' || user.role === 'org_admin') {
     linksStr += `<a href="#/admin" class="nav-link"><i class='bx bx-pie-chart-alt'></i> דשבורד מנהל</a>`
     linksStr += `<a href="#/admin/scorm" class="nav-link"><i class='bx bx-upload'></i> ניהול לומדות</a>`
     linksStr += `<a href="#/admin/users" class="nav-link"><i class='bx bx-user'></i> ניהול עובדים</a>`
-    linksStr += `<a href="#/admin/assignments" class="nav-link"><i class='bx bx-group'></i> הקצאת עובדים</a>`
     linksStr += `<a href="#/learner" class="nav-link"><i class='bx bx-book-open'></i> תצוגת לומד</a>`
   } else {
     linksStr += `<a href="#/learner" class="nav-link"><i class='bx bx-home'></i> האזור האישי שלי</a>`

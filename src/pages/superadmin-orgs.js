@@ -1,4 +1,6 @@
-import { fetchOrganizations, createOrganization, updateOrganization } from '../api/orgApi.js'
+import { fetchOrganizations, createOrganization, updateOrganization, deleteOrganization } from '../api/orgApi.js'
+import { resetOrgProgress } from '../api/progressApi.js'
+import { showConfirmModal, showToast } from '../lib/ui.js'
 
 export default async function renderSuperAdminOrgs(container) {
   container.innerHTML = `
@@ -40,7 +42,7 @@ export default async function renderSuperAdminOrgs(container) {
                <tr>
                   <th>שם הארגון</th>
                   <th>משתמשים</th>
-                  <th>לומדות (SCORM)</th>
+                  <th>לומדות</th>
                   <th>תאריך הקמה</th>
                   <th>פעולות</th>
                </tr>
@@ -54,84 +56,130 @@ export default async function renderSuperAdminOrgs(container) {
   `
 
   const tableBody = container.querySelector('#orgs-table tbody')
+  const form = container.querySelector('#org-create-form')
 
   async function renderTable() {
     try {
+      tableBody.innerHTML = `<tr><td colspan="5" style="text-align: center;"><i class='bx bx-loader bx-spin'></i> טוען...</td></tr>`
       const orgs = await fetchOrganizations()
+      console.log(`[LMS] Table Render: Fetched ${orgs.length} organizations.`);
       if (orgs.length === 0) {
         tableBody.innerHTML = `<tr><td colspan="5" style="text-align: center;" class="text-muted">אין ארגונים במערכת</td></tr>`
         return
       }
 
       tableBody.innerHTML = orgs.map(o => `
-        <tr>
-           <td><div style="font-weight: 500;">${o.name}</div></td>
-           <td><span class="badge badge-success">${o.total_users || 0} פעילים</span></td>
+        <tr data-id="${o.id}">
+           <td>
+              <div style="font-weight: 500;">${o.name}</div>
+           </td>
+           <td>
+              <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; background: hsl(var(--color-success)/0.1); color: hsl(var(--color-success)); border-radius: 500px; width: 65px; height: 65px; font-weight: bold; line-height: 1.1; margin: 0 auto;">
+                <span style="font-size: 1.2rem;">${o.total_users || 0}</span>
+                <span style="font-size: 0.7rem; opacity: 0.9;">פעילים</span>
+              </div>
+           </td>
            <td><span class="badge badge-primary">${o.total_courses || 0} חבילות</span></td>
            <td>${o.created_at ? new Date(o.created_at).toLocaleDateString('he-IL') : '-'}</td>
            <td>
              <div class="flex gap-2">
-               <button class="btn btn-outline text-sm edit-org-btn" data-id="${o.id}" data-name="${o.name}" data-color="${o.primary_color || '#0066FF'}" title="עריכת White Label"><i class='bx bx-edit'></i></button>
-               <button class="btn btn-primary text-sm enter-org-btn" data-id="${o.id}" data-name="${o.name}" title="כניסה לסביבת הארגון"><i class='bx bx-door-open'></i> למערכת</button>
+               <button class="btn btn-outline text-sm edit-org-btn" 
+                 data-id="${o.id}" data-name="${o.name}" data-color="${o.primary_color || '#0066FF'}" 
+                 title="עריכה">
+                 <i class='bx bx-edit'></i>
+               </button>
+                <button class="btn btn-outline text-sm reset-org-btn" data-id="${o.id}" data-name="${o.name}" title="איפוס נתונים">
+                  <i class='bx bx-refresh' style="color: hsl(var(--color-danger));"></i>
+                </button>
+               <button class="btn btn-primary text-sm enter-org-btn" data-id="${o.id}" data-name="${o.name}" title="למערכת">
+                 <i class='bx bx-door-open'></i> למערכת
+               </button>
+               <button class="btn btn-outline text-sm delete-org-btn" data-id="${o.id}" data-name="${o.name}" title="מחיקת ארגון">
+                 <i class='bx bx-trash' style="color: hsl(var(--color-danger));"></i>
+               </button>
              </div>
            </td>
         </tr>
       `).join('')
-
-      // Event Listeners for action buttons
-      tableBody.querySelectorAll('.edit-org-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          document.getElementById('edit-org-id').value = btn.dataset.id;
-          document.getElementById('org-name').value = btn.dataset.name;
-          document.getElementById('org-color').value = btn.dataset.color || '#0066FF';
-          
-          document.getElementById('org-submit-btn').innerHTML = `<i class='bx bx-save'></i> שמור שינויים`;
-          document.querySelector('h3').innerText = 'עריכת ארגון קיים';
-          document.getElementById('org-cancel-edit').style.display = 'flex';
-        });
-      });
-
-      tableBody.querySelectorAll('.enter-org-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const orgId = btn.dataset.id;
-          const orgName = btn.dataset.name;
-          // Impersonate
-          window.__APP_STATE.user.originalRole = window.__APP_STATE.user.role;
-          window.__APP_STATE.user.originalOrgId = window.__APP_STATE.user.orgId;
-          window.__APP_STATE.user.role = 'org_admin';
-          window.__APP_STATE.user.orgId = orgId;
-          window.__APP_STATE.user.orgName = orgName;
-          
-          // Redirect to admin dashboard
-          window.location.hash = '#/admin';
-        });
-      });
-
     } catch (err) {
-      tableBody.innerHTML = `<tr><td colspan="5" style="color: hsl(var(--color-danger)); text-align: center;">שגיאה בטעינת הארגונים: ${err.message}</td></tr>`
+      tableBody.innerHTML = `<tr><td colspan="5" style="color: hsl(var(--color-danger)); text-align: center;">שגיאה: ${err.message}</td></tr>`
     }
   }
 
-  // Initial render
+  tableBody.addEventListener('click', async (e) => {
+    const editBtn = e.target.closest('.edit-org-btn');
+    const enterBtn = e.target.closest('.enter-org-btn');
+    const resetBtn = e.target.closest('.reset-org-btn');
+    const deleteBtn = e.target.closest('.delete-org-btn');
+
+    if (deleteBtn) {
+      const orgId = deleteBtn.dataset.id;
+      const orgName = deleteBtn.dataset.name;
+      
+      await showConfirmModal({
+        title: 'מחיקת ארגון לצמיתות',
+        message: `אתה עומד למחוק את ארגון <strong>${orgName}</strong>. פעולה זו תמחק את כל המידע הקשור לארגון ולא ניתנת לביטול! האם להמשיך?`,
+        confirmText: 'מחק ארגון לצמיתות',
+        onConfirm: async () => {
+            try {
+                await deleteOrganization(orgId);
+                showToast(`הארגון ${orgName} נמחק מהמערכת`);
+                renderTable();
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
+        }
+      });
+    }
+
+    if (resetBtn) {
+      const orgId = resetBtn.dataset.id;
+      const orgName = resetBtn.dataset.name;
+      
+      await showConfirmModal({
+        title: 'אזהרת איפוס ארגון',
+        message: `האם אתה בטוח שברצונך למחוק את <strong>כל נתוני اللמידה</strong> של ארגון <strong>${orgName}</strong>? פעולה זו אינה הפיכה.`,
+        onConfirm: async () => {
+            await resetOrgProgress(orgId);
+            showToast(`כל נתוני הלמידה של ${orgName} אופסו`);
+        }
+      });
+    }
+
+    if (editBtn) {
+      document.getElementById('edit-org-id').value = editBtn.dataset.id;
+      document.getElementById('org-name').value = editBtn.dataset.name;
+      document.getElementById('org-color').value = editBtn.dataset.color || '#0066FF';
+      document.getElementById('org-submit-btn').innerHTML = `<i class='bx bx-save'></i> שמור שינויים`;
+      container.querySelector('.card h3').innerText = 'עריכת ארגון קיים';
+      document.getElementById('org-cancel-edit').style.display = 'flex';
+    }
+
+    if (enterBtn) {
+      const user = window.__APP_STATE?.user;
+      if (!user) return;
+      user.originalRole = user.role;
+      user.originalOrgId = user.orgId;
+      user.role = 'org_admin';
+      user.orgId = enterBtn.dataset.id;
+      user.orgName = enterBtn.dataset.name;
+      window.location.hash = '#/admin';
+    }
+  });
+
   await renderTable()
 
-  // Cancel Edit reset
   container.querySelector('#org-cancel-edit').addEventListener('click', () => {
     form.reset();
     document.getElementById('edit-org-id').value = '';
     document.getElementById('org-submit-btn').innerHTML = `<i class='bx bx-plus-circle'></i> פתח סביבת הדרכה`;
-    document.querySelector('h3').innerText = 'יצירת ארגון חדש';
+    container.querySelector('.card h3').innerText = 'יצירת ארגון חדש';
     document.getElementById('org-cancel-edit').style.display = 'none';
   });
 
-  // Handle org creation/update
-  const form = container.querySelector('#org-create-form')
   form.addEventListener('submit', async (e) => {
     e.preventDefault()
-    const msg = document.getElementById('org-msg')
-    const submitBtn = form.querySelector('button[type="submit"]')
-    
-    // Values
+    const submitBtn = document.getElementById('org-submit-btn')
     const orgId = document.getElementById('edit-org-id').value;
     const orgName = document.getElementById('org-name').value;
     const orgColor = document.getElementById('org-color').value;
@@ -142,25 +190,21 @@ export default async function renderSuperAdminOrgs(container) {
     try {
       if (orgId) {
         await updateOrganization(orgId, orgName, orgColor);
-        msg.innerHTML = 'הארגון עודכן בהצלחה!';
+        showToast('הארגון עודכן');
       } else {
         await createOrganization(orgName, orgColor);
-        msg.innerHTML = 'הארגון נוצר בהצלחה!';
+        showToast('הארגון נוצר בהצלחה');
       }
       await renderTable();
       form.reset();
       document.getElementById('edit-org-id').value = '';
       submitBtn.innerHTML = `<i class='bx bx-plus-circle'></i> פתח סביבת הדרכה`;
-      document.querySelector('h3').innerText = 'יצירת ארגון חדש';
+      container.querySelector('.card h3').innerText = 'יצירת ארגון חדש';
       document.getElementById('org-cancel-edit').style.display = 'none';
-      msg.style.color = 'hsl(var(--color-success))';
     } catch (err) {
-      msg.style.color = 'hsl(var(--color-danger))';
-      msg.innerHTML = 'שגיאה: ' + err.message;
-      submitBtn.innerHTML = orgId ? `<i class='bx bx-save'></i> שמור שינויים` : `<i class='bx bx-plus-circle'></i> פתח סביבת הדרכה`;
+      showToast(err.message, 'error');
     } finally {
       submitBtn.disabled = false;
-      setTimeout(() => { msg.innerHTML = '' }, 3000)
     }
   })
 }

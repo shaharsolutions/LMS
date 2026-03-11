@@ -1,5 +1,5 @@
 import { initRouter } from './src/router.js'
-import { checkAuth } from './src/auth.js'
+import { checkAuth, onAuthStatusChange } from './src/auth.js'
 
 document.addEventListener('DOMContentLoaded', async () => {
   const appContainer = document.getElementById('app')
@@ -10,6 +10,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Set global data and init router
     window.__APP_STATE = { user }
+    
+    // Listen for session invalidations
+    onAuthStatusChange();
+
     initRouter(appContainer)
     
   } catch (err) {

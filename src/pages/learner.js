@@ -47,7 +47,7 @@ export default async function renderLearnerDashboard(container) {
     const assignments = await fetchLearnerAssignments();
     
     if (assignments.length === 0) {
-      coursesContainer.innerHTML = `<div class="card" style="grid-column: span 3; padding: 3rem; text-align: center;">הידד! סיימת את כל הלומדות המוקצות.</div>`;
+      coursesContainer.innerHTML = `<div class="card" style="grid-column: span 3; padding: 3rem; text-align: center;">בינתיים אין לומדות שצריך לבצע</div>`;
       document.getElementById('stat-pending').textContent = '0';
       document.getElementById('stat-progress').textContent = '0';
       document.getElementById('stat-done').textContent = '0';

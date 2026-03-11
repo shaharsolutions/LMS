@@ -1,8 +1,7 @@
 import { uploadCourse, deleteCourse, fetchCourses } from '../api/coursesApi.js'
+import { showConfirmModal, showToast } from '../lib/ui.js'
 
 export default async function renderAdminScorm(container) {
-  // We use async render because we need to fetch courses from real DB
-  
   container.innerHTML = `
     <div class="mb-4 fade-in">
       <h1 class="mb-1">ניהול והעלאת לומדות (SCORM)</h1>
@@ -76,62 +75,43 @@ export default async function renderAdminScorm(container) {
 
       tableBody.innerHTML = courses.map(c => `
         <tr>
-           <td>
-              <div style="font-weight: 500;">${c.title}</div>
-           </td>
+           <td><div style="font-weight: 500;">${c.title}</div></td>
            <td><span class="badge badge-primary">${c.category || 'כללי'}</span></td>
            <td><span class="badge ${c.published ? 'badge-success' : 'badge-warning'}">${c.published ? 'מפורסם' : 'טיוטה'}</span></td>
            <td>${new Date(c.created_at).toLocaleDateString('he-IL')}</td>
            <td>
              <div class="flex gap-2">
                <button class="btn btn-outline text-sm" onclick="window.location.hash = '#/player?id=${c.id}'" title="תצוגה מקדימה"><i class='bx bx-play'></i></button>
-               <button class="btn btn-outline text-sm delete-btn" data-id="${c.id}" title="מחק"><i class='bx bx-trash' style="color: hsl(var(--color-danger));"></i></button>
+               <button class="btn btn-outline text-sm delete-btn" data-id="${c.id}" data-title="${c.title}" title="מחק"><i class='bx bx-trash' style="color: hsl(var(--color-danger));"></i></button>
              </div>
            </td>
         </tr>
       `).join('')
 
-      // Append delete event listeners
       container.querySelectorAll('.delete-btn').forEach(btn => {
         btn.addEventListener('click', async (e) => {
-          const id = e.currentTarget.getAttribute('data-id')
-          const btn = e.currentTarget;
+          const id = e.currentTarget.getAttribute('data-id');
+          const title = e.currentTarget.getAttribute('data-title');
           
-          if (btn.classList.contains('confirming')) {
-            btn.innerHTML = `<i class='bx bx-loader-alt bx-spin'></i>`
-            try {
-                await deleteCourse(id)
-                renderTable() // refresh table
-            } catch(err) {
-                btn.innerHTML = 'שגיאה';
-                setTimeout(() => renderTable(), 2000);
+          await showConfirmModal({
+            title: 'מחיקת לומדה',
+            message: `האם אתה בטוח שברצונך למחוק את הלומדה <strong>${title}</strong>? כל נתוני ההתקדמות של המשתמשים יימחקו לצמיתות.`,
+            confirmText: 'מחק לצמיתות',
+            onConfirm: async () => {
+                await deleteCourse(id);
+                showToast('הלומדה נמחקה בהצלחה');
+                renderTable();
             }
-          } else {
-            btn.classList.add('confirming');
-            btn.innerHTML = `אישור \u26A0`;
-            btn.classList.remove('btn-outline');
-            btn.classList.add('btn-danger');
-            
-            setTimeout(() => {
-                if (document.body.contains(btn)) {
-                    btn.classList.remove('confirming');
-                    btn.innerHTML = `<i class='bx bx-trash' style="color: hsl(var(--color-danger));"></i>`;
-                    btn.classList.add('btn-outline');
-                    btn.classList.remove('btn-danger');
-                }
-            }, 3000);
-          }
+          });
         })
       })
     } catch (err) {
-      tableBody.innerHTML = `<tr><td colspan="5" style="color: hsl(var(--color-danger)); text-align: center;">שגיאה בטעינת נתונים: ${err.message}</td></tr>`
+      tableBody.innerHTML = `<tr><td colspan="5" style="color: hsl(var(--color-danger)); text-align: center;">שגיאה: ${err.message}</td></tr>`
     }
   }
 
-  // Initial table render
   await renderTable()
 
-  // Handle form upload
   const form = container.querySelector('#scorm-upload-form')
   form.addEventListener('submit', async (e) => {
     e.preventDefault()
@@ -140,8 +120,7 @@ export default async function renderAdminScorm(container) {
     const msg = document.getElementById('upload-msg')
     
     if (!file || !file.name.toLowerCase().endsWith('.zip')) {
-      msg.style.color = 'hsl(var(--color-danger))'
-      msg.innerHTML = 'נא להעלות קובץ ZIP תקני בלבד'
+      showToast('נא להעלות קובץ ZIP תקני', 'error');
       return
     }
 
@@ -153,25 +132,18 @@ export default async function renderAdminScorm(container) {
 
     const submitBtn = form.querySelector('button[type="submit"]')
     submitBtn.disabled = true
-    submitBtn.innerHTML = `<i class='bx bx-loader-alt bx-spin'></i> מעלה נתונים מאובטחים...`
+    submitBtn.innerHTML = `<i class='bx bx-loader-alt bx-spin'></i> מעלה...`
     
     try {
       await uploadCourse(courseData, file)
+      showToast('הלומדה הועלתה בהצלחה');
       await renderTable()
-      
+      form.reset()
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
       submitBtn.disabled = false
       submitBtn.innerHTML = `<i class='bx bx-cloud-upload'></i> העלה ופרסם לומדה`
-      
-      msg.style.color = 'hsl(var(--color-success))'
-      msg.innerHTML = 'הלומדה הועלתה ופורסמה בהצלחה בארגון שלך!'
-      form.reset()
-      
-      setTimeout(() => { msg.innerHTML = '' }, 3000)
-    } catch (err) {
-      submitBtn.disabled = false
-      submitBtn.innerHTML = `<i class='bx bx-cloud-upload'></i> נסה שנית`
-      msg.style.color = 'hsl(var(--color-danger))'
-      msg.innerHTML = 'שגיאת שרת: ' + err.message
     }
   })
 }

@@ -1,57 +1,249 @@
-import { saveLearnerProgress } from '../api/progressApi.js'
+import { saveLearnerProgress, fetchCourseProgress } from '../api/progressApi.js'
+import { fetchCourseById } from '../api/coursesApi.js'
+import { getCurrentUserSync } from '../api/authApi.js'
+import { parseScormTime, formatScorm12Time } from '../lib/scormUtils.js'
 
-export default function renderPlayer(container) {
-  // Extract course ID from hash (e.g., #/player?id=c1)
+// Aggressive global cleanup for intervals
+if (window._lmsHeartbeat) clearInterval(window._lmsHeartbeat);
+window._lmsActiveCourseId = null;
+
+export default async function renderPlayer(container) {
   const urlParams = new URLSearchParams(window.location.hash.split('?')[1] || '')
   const courseId = urlParams.get('id') || 'unknown'
+  const user = getCurrentUserSync();
 
-  // Notify backend that user opened the course
-  saveLearnerProgress(courseId, { status: 'in_progress', progress: Math.max(0, Math.floor(Math.random() * 20)), time: 0 });
+  // Update global tracking
+  if (window._lmsHeartbeat) clearInterval(window._lmsHeartbeat);
+  window._lmsActiveCourseId = courseId;
 
   container.innerHTML = `
-    <div class="fade-in" style="display: flex; flex-direction: column; height: calc(100vh - 120px);">
-      <div class="flex justify-between items-center mb-3">
-        <div>
-          <h2 class="mb-1">נגן לומדה (SCORM)</h2>
-          <p class="text-sm text-muted">מזהה קורס: ${courseId}</p>
-        </div>
-        <button class="btn btn-outline" onclick="window.history.back()">
-          <i class='bx bx-arrow-back'></i> חזור לאזור האישי
-        </button>
-      </div>
-      
-      <div class="card" style="flex: 1; padding: 0; overflow: hidden; display: flex; flex-direction: column;">
-        <!-- Mock iFrame for SCORM content -->
-        <div style="background: #232323; color: white; padding: 0.5rem 1rem; display: flex; justify-content: space-between; align-items: center;">
-          <span class="text-sm"><i class='bx bx-play-circle'></i> LMS Enterprise SaaS SCORM Runtime</span>
-          <div class="flex gap-2">
-             <button class="btn btn-primary text-sm" style="padding: 0.25rem 0.75rem;" id="scorm-action-btn"><i class='bx bx-save'></i> שמור התקדמות וסיים</button>
-          </div>
-        </div>
-        <div style="flex: 1; min-height: 400px; display: flex; align-items: center; justify-content: center; background: hsl(var(--bg-body)); position: relative;">
-          <div style="text-align: center;">
-            <i class='bx bx-slideshow' style="font-size: 4rem; color: hsl(var(--border-color)); margin-bottom: 1rem;"></i>
-            <h3>תוכן הלומדה (Iframe Area)</h3>
-            <p class="text-muted text-sm mt-2">במוצר האמיתי ה-SCORM Cloud או SCORM RTE מקומי ירוץ כאן וישגר פונקציות CMI ל-LMS.</p>
-            <div id="scorm-msg" class="mt-4 text-sm font-medium" style="color: hsl(var(--color-success));"></div>
-          </div>
-        </div>
+    <div style="display: flex; flex-direction: column; height: 100vh; background: #0f172a; align-items: center; justify-content: center; font-family: 'Heebo', sans-serif;">
+      <div style="text-align: center;">
+        <i class='bx bx-loader-alt bx-spin' style="font-size: 4rem; color: #3b82f6;"></i>
+        <p style="margin-top: 1.5rem; color: #94a3b8; font-size: 1.25rem; font-weight: 500;">טוען את נתוני הקורס...</p>
       </div>
     </div>
-  `
+  `;
 
-  setTimeout(() => {
-    document.getElementById('scorm-action-btn').addEventListener('click', async () => {
-      document.getElementById('scorm-msg').innerHTML = '<i class="bx bx-loader bx-spin"></i> מעדכן התקדמות ומסיים מול השרת...';
+  try {
+    const [course, existingProgress] = await Promise.all([
+      fetchCourseById(courseId),
+      fetchCourseProgress(courseId)
+    ]);
+
+    if (!course) throw new Error("הקורס לא נמצא");
+
+    const runtime = {
+      courseId: courseId,
+      status: existingProgress?.status || 'not_started',
+      progress: parseInt(existingProgress?.progress_percent || 0),
+      score: parseInt(existingProgress?.score || 0),
+      baseTimeSeconds: parseInt(existingProgress?.time_spent_seconds || 0),
+      sessionTimeSeconds: 0,
+      startTime: Date.now(),
+      suspendData: existingProgress?.suspend_data || '',
+      location: existingProgress?.lesson_location || '',
+      lastSync: 0
+    };
+
+    console.warn(`[LMS] Initial State for ${courseId}: Status=${runtime.status}, Location="${runtime.location}", Progress=${runtime.progress}%`);
+
+    const syncProgress = async (label = "periodic") => {
+      if (window._lmsActiveCourseId !== runtime.courseId) return;
+
+      const now = Date.now();
+      if (label === "heartbeat" && now - runtime.lastSync < 15000) return; 
+      
+      const elapsed = Math.floor((now - runtime.startTime) / 1000);
+      const totalTime = runtime.baseTimeSeconds + Math.max(runtime.sessionTimeSeconds, elapsed);
+      
+      if (runtime.status === 'not_started' && totalTime > 15) runtime.status = 'in_progress';
+      
+      let finalProgress = runtime.progress;
+      // UI Boost: Ensure at least 5% if in progress, but if we have real progress (like 14%), use it!
+      if (runtime.status === 'in_progress' && finalProgress < 5) finalProgress = 5;
+      if (runtime.status === 'completed') finalProgress = 100;
+
+      runtime.lastSync = now;
+      console.log(`[LMS] Syncing (${label}): Loc="${runtime.location}", Progress=${finalProgress}%`);
+
       try {
-        // במוצר אמיתי כאן נשלוף את ההתקדמות והציון האמיתיים של ה-SCORM במקום ציון חלש של 100 קבוע
-        await saveLearnerProgress(courseId, { status: 'completed', progress: 100, time: 1800 }); 
-        document.getElementById('scorm-msg').innerHTML = 'ההדרכה נשמרה והושלמה בהצלחה. מחזיר לאזור אישי...';
-        setTimeout(() => window.history.back(), 2000);
-      } catch (err) {
-        document.getElementById('scorm-msg').style.color = 'hsl(var(--color-danger))';
-        document.getElementById('scorm-msg').innerHTML = 'שגיאה בשמירת ובסיום ההדרכה מול השרת.';
+        await saveLearnerProgress(runtime.courseId, { 
+          status: runtime.status,
+          progress: finalProgress,
+          score: runtime.score,
+          time: totalTime,
+          suspend_data: runtime.suspendData,
+          lesson_location: runtime.location
+        });
+      } catch (e) {
+          console.error(`[LMS] Sync error:`, e.message);
       }
+    };
+
+    window._lmsHeartbeat = setInterval(() => {
+        syncProgress("heartbeat").catch(() => {});
+    }, 20000);
+
+    const API = {
+      _initialized: false,
+      Initialize: (n) => { 
+          console.warn("[LMS] SCORM Initialize called");
+          API._initialized = true; 
+          return "true"; 
+      },
+      LMSInitialize: (n) => API.Initialize(n),
+      
+      GetValue: (n) => {
+        const key = n.toLowerCase();
+        let val = "";
+        
+        if (key.includes('student_name')) val = user?.fullName || "Learner";
+        else if (key.includes('lesson_status') || key.includes('completion_status')) {
+            val = runtime.status === 'completed' ? 'completed' : (runtime.status === 'in_progress' ? 'incomplete' : 'not attempted');
+        }
+        else if (key.includes('location')) val = runtime.location || "";
+        else if (key.includes('suspend_data')) val = runtime.suspendData || "";
+        else if (key.includes('score.raw')) val = String(runtime.score || 0);
+        else if (key.includes('progress_measure')) val = String(runtime.progress / 100);
+        else if (key.includes('entry')) val = (runtime.baseTimeSeconds > 5 || runtime.location) ? "resume" : "ab-initio";
+        else if (key.includes('total_time')) val = formatScorm12Time(runtime.baseTimeSeconds);
+        
+        console.log(`[LMS] GetValue(${n}) -> "${val}"`);
+        return val;
+      },
+      LMSGetValue: (n) => API.GetValue(n),
+
+      SetValue: (n, v) => {
+        const key = n.toLowerCase();
+        let changed = false;
+
+        console.log(`[LMS] SetValue(${n}, "${v}")`);
+
+        if (key.includes('lesson_status') || key.includes('completion_status')) {
+            const status = (v === 'passed' || v === 'completed') ? 'completed' : 'in_progress';
+            if (runtime.status !== status) { runtime.status = status; changed = true; }
+        }
+        else if (key.includes('location')) {
+            if (v && runtime.location !== v) { runtime.location = v; changed = true; }
+        }
+        else if (key.includes('suspend_data')) {
+            if (v && runtime.suspendData !== v) { runtime.suspendData = v; changed = true; }
+        }
+        else if (key.includes('score.raw')) {
+            const num = parseInt(v);
+            if (!isNaN(num)) { runtime.score = num; changed = true; }
+        }
+        else if (key.includes('progress_measure')) {
+            const p = Math.round(parseFloat(v) * 100);
+            if (!isNaN(p) && p !== runtime.progress) { runtime.progress = p; changed = true; }
+        }
+        else if (key.includes('progress_percent')) {
+            const p = parseInt(v);
+            if (!isNaN(p) && p !== runtime.progress) { runtime.progress = p; changed = true; }
+        }
+        else if (key.includes('session_time')) {
+            runtime.sessionTimeSeconds = parseScormTime(v);
+            // Don't mark as changed for just session time to avoid spamming, wait for Commit
+        }
+
+        if (changed) {
+            syncProgress("setValue").catch(() => {});
+        }
+        return "true";
+      },
+      LMSSetValue: (n, v) => API.SetValue(n, v),
+      
+      Commit: () => { 
+          console.log("[LMS] SCORM Commit called");
+          syncProgress("commit").catch(() => {}); 
+          return "true"; 
+      },
+      LMSCommit: () => API.Commit(),
+      
+      Finish: () => { 
+          console.warn("[LMS] SCORM Finish called");
+          syncProgress("exit").catch(() => {}); 
+          return "true"; 
+      },
+      LMSFinish: () => API.Finish(),
+      Terminate: () => API.Finish(),
+      
+      GetLastError: () => "0", LMSGetLastError: () => "0",
+      GetErrorString: () => "", LMSGetErrorString: () => "",
+      GetDiagnostic: () => "", LMSGetDiagnostic: () => ""
+    };
+
+    window.API = window.API_1484_11 = API;
+
+    container.innerHTML = `
+      <div style="display: flex; flex-direction: column; height: 100vh; background: #0f172a; overflow: hidden;">
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 24px; background: #ffffff; border-bottom: 1px solid #e2e8f0; z-index: 50; flex-shrink: 0;">
+          <h2 style="margin: 0; font-size: 1.25rem; font-weight: 700; color: #1e293b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+            ${course.title}
+          </h2>
+          <button class="btn btn-primary" id="scorm-save-exit" style="display: flex; align-items: center; gap: 8px; padding: 8px 20px;">
+            <i class='bx bx-log-out-circle'></i>
+            <span>שמור וצא</span>
+          </button>
+        </div>
+
+        <div style="flex: 1; display: flex; align-items: center; justify-content: center; padding: 20px; overflow: hidden; position: relative;">
+          <div style="
+            width: 100%;
+            height: 100%;
+            max-width: 1280px;
+            max-height: 720px;
+            aspect-ratio: 16 / 9;
+            background: #000;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            border-radius: 12px;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          ">
+            <div id="iframe-loader" style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: #000; z-index: 10;">
+              <div style="text-align: center;">
+                <i class='bx bx-loader-alt bx-spin' style="font-size: 3.5rem; color: #3b82f6;"></i>
+                <p style="color: #94a3b8; margin-top: 1rem; font-weight: 500;">טוען את הלומדה...</p>
+              </div>
+            </div>
+            <iframe id="scorm-iframe" style="width: 100%; height: 100%; border:0; opacity:0; transition: opacity 0.5s ease;"></iframe>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const iframe = document.getElementById('scorm-iframe');
+    const baseDir = course.fileUrl.substring(0, course.fileUrl.lastIndexOf('/') + 1);
+
+    const response = await fetch(course.fileUrl);
+    const html = await response.text();
+
+    const injection = `
+      <script>
+        window.API = window.parent.API;
+        window.API_1484_11 = window.parent.API;
+      </script>
+    `;
+
+    iframe.srcdoc = html.replace(/<head>/i, '<head><base href="' + baseDir + '">' + injection);
+    
+    iframe.onload = () => { 
+        document.getElementById('iframe-loader').style.display = 'none'; 
+        iframe.style.opacity = '1'; 
+    };
+
+    document.getElementById('scorm-save-exit').addEventListener('click', async () => { 
+        document.getElementById('scorm-save-exit').disabled = true;
+        document.getElementById('scorm-save-exit').textContent = 'שומר...';
+        try { iframe.contentWindow.dispatchEvent(new Event('unload')); } catch(e) {}
+        await syncProgress("manual_exit");
+        window.history.back();
     });
-  }, 0);
+
+  } catch (err) { container.innerHTML = `<div class="p-8 text-center text-danger">${err.message}</div>`; }
 }

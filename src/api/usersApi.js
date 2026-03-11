@@ -7,38 +7,112 @@ let MOCK_USERS = [
   { id: 'usr-4', full_name: 'דינה כהן - מוקד', role: 'learner', email: 'dina@test.com', status: 'ממתין', org_id: 'org-2', created_at: '15/02/2026' }
 ]
 
+function formatPhoneToE164(phone) {
+  if (!phone) return phone;
+  const digits = phone.replace(/\D/g, '');
+  if (digits.startsWith('0')) {
+    return '+972' + digits.substring(1);
+  }
+  return phone;
+}
+
+function formatPhoneForDisplay(phone) {
+  if (!phone) return phone;
+  if (phone.startsWith('+972')) {
+    const local = '0' + phone.substring(4);
+    if (local.length === 10) {
+      return local.substring(0, 3) + '-' + local.substring(3);
+    }
+    return local;
+  }
+  return phone;
+}
+
 export async function fetchUsers() {
   const currentUser = getCurrentUserSync();
-  if (!currentUser || currentUser.role !== 'org_admin') throw new Error("אין הרשאה");
+  console.log(`[LMS] fetchUsers - Current User:`, currentUser);
+  if (!currentUser || (currentUser.role !== 'org_admin' && currentUser.role !== 'super_admin')) throw new Error("אין הרשאה");
 
   if (supabase) {
-    const { data, error } = await supabase
+    let query = supabase
       .from('profiles')
-      .select('id, full_name, role, created_at')
-      .eq('org_id', currentUser.orgId);
+      .select(`
+        id, full_name, role, email, phone, created_at, org_id,
+        organizations (name),
+        group_members (
+          groups (id, name)
+        )
+      `);
       
-    if (error) throw new Error(error.message);
+    // Filter by org ONLY for non-super admins
+    if (currentUser.role !== 'super_admin') {
+        if (currentUser.orgId) {
+            query = query.eq('org_id', currentUser.orgId);
+        } else {
+            return [];
+        }
+    }
     
-    // In a real system, email and status might come from a secure view linking auth.users
-    return data.map(u => ({
-        ...u,
-        email: '---', // Needs secure backend to fetch auth emails
-        status: 'פעיל'
-    }));
+    const { data, error } = await query.neq('role', 'super_admin');
+    console.log(`[LMS] fetchUsers - Raw data from DB:`, data);
+      
+    if (error) {
+        console.error(`[LMS] fetchUsers Error:`, error);
+        throw new Error(error.message);
+    }
+    
+    console.log(`[LMS] fetchUsers - Fetched ${data?.length || 0} users`);
+    return data.map(u => {
+        // Filter out any null groups or empty results from the join
+        const userGroups = (u.group_members || [])
+            .map(gm => gm.groups)
+            .filter(g => g && g.id && g.name);
+            
+        return {
+            ...u,
+            org_name: u.organizations?.name || 'ללא ארגון',
+            phone: formatPhoneForDisplay(u.phone),
+            email: u.email || '---', 
+            status: 'פעיל',
+            groups: userGroups
+        };
+    });
   } else {
+    if (currentUser.role === 'super_admin') return MOCK_USERS;
     return MOCK_USERS.filter(u => u.org_id === currentUser.org_id);
   }
 }
 
 export async function createUser(userData) {
   const currentUser = getCurrentUserSync();
-  if (!currentUser || currentUser.role !== 'org_admin') throw new Error("אין הרשאה");
+  if (!currentUser || (currentUser.role !== 'org_admin' && currentUser.role !== 'super_admin')) throw new Error("אין הרשאה");
 
   if (supabase) {
-    // Note: In Supabase, creating an auth user typically requires a backend Edge Function 
-    // or using the Admin API, because client-side signups log the current user out.
-    // For this MVP, we will simulate the profile creation or throw a supportive error.
-    throw new Error('יצירת משתמשים דורשת חיבור ל-Edge Functions ב-Supabase שטרם הוגדר.');
+    const { data, error } = await supabase.functions.invoke('create-user', {
+      body: {
+        email: userData.email,
+        password: userData.password,
+        fullName: userData.fullName,
+        phone: formatPhoneToE164(userData.phone),
+        role: userData.role || 'learner',
+        orgId: userData.orgId || currentUser.orgId,
+        callerId: currentUser.id
+      }
+    });
+
+    if (error) {
+      console.error("[LMS] create-user Edge Function Error:", error);
+      if (error.message?.includes('401') || error.status === 401) {
+        throw new Error("פג תוקף החיבור למערכת. אנא התנתק והתחבר מחדש.");
+      }
+      throw new Error("שגיאה בתקשורת עם השרת ליצירת משתמש: " + error.message);
+    }
+
+    if (data && data.error) {
+      throw new Error(data.error);
+    }
+
+    return data.user;
   } else {
     // Mock
     const newUser = {
@@ -55,11 +129,151 @@ export async function createUser(userData) {
   }
 }
 
-export async function deleteUser(userId) {
+export async function updateUser(userId, userData) {
+  const currentUser = getCurrentUserSync();
+  if (!currentUser || (currentUser.role !== 'org_admin' && currentUser.role !== 'super_admin')) throw new Error("אין הרשאה");
+
   if (supabase) {
-    // Requires Admin API or Edge Function
-    throw new Error('מחיקת משתמשים דורשת API פנימי של השרת לאבטחה.');
+    const finalOrgId = userData.orgId || currentUser.orgId;
+
+    // 1. Invoke Edge Function for Auth-level changes (Email, Password, Role)
+    const { data, error } = await supabase.functions.invoke('update-user', {
+      body: {
+        userId: userId,
+        password: userData.password,
+        fullName: userData.fullName,
+        email: userData.email,
+        phone: formatPhoneToE164(userData.phone),
+        role: userData.role || 'learner',
+        orgId: finalOrgId,
+        callerId: currentUser.id
+      }
+    });
+
+    if (error) {
+      console.error("[LMS] Edge Function Invoke Error:", error);
+      if (error.message?.includes('401') || error.status === 401) {
+        throw new Error("פג תוקף החיבור למערכת. אנא התנתק והתחבר מחדש.");
+      }
+      throw new Error("שגיאה בתקשורת עם השרת לעדכון משתמש: " + error.message);
+    }
+
+    if (data && data.error) {
+      throw new Error(data.error);
+    }
+
+    // 2. Proactively update the profiles table to ensure RLS-correct data
+    // This handles the case where the Edge Function might fail to update denormalized org_id
+    const { error: profileError, count } = await supabase
+      .from('profiles')
+      .update({
+        full_name: userData.fullName,
+        phone: formatPhoneToE164(userData.phone),
+        role: userData.role,
+        org_id: finalOrgId
+      }, { count: 'exact' })
+      .eq('id', userId);
+
+    if (profileError) {
+      console.warn("[LMS] Direct profile update failed:", profileError.message);
+      // We don't throw here if the Edge Function supposedly succeeded, but we should log it
+    }
+
+    // 3. If org changed, sync related tables (like in bulk move)
+    if (count > 0 && finalOrgId) {
+        await supabase.from('course_assignments').update({ org_id: finalOrgId }).eq('user_id', userId);
+        await supabase.from('learner_progress').update({ org_id: finalOrgId }).eq('user_id', userId);
+    }
+
+    return true;
+  } else {
+    // Mock
+    const userIndex = MOCK_USERS.findIndex(u => u.id === userId);
+    if (userIndex !== -1) {
+      MOCK_USERS[userIndex].full_name = userData.fullName;
+      MOCK_USERS[userIndex].role = userData.role || 'learner';
+      if (userData.orgId) MOCK_USERS[userIndex].org_id = userData.orgId;
+    }
+    return true;
+  }
+}
+
+export async function deleteUser(userId) {
+  const currentUser = getCurrentUserSync();
+  if (!currentUser || (currentUser.role !== 'org_admin' && currentUser.role !== 'super_admin')) throw new Error("אין הרשאה");
+
+  if (supabase) {
+    const { data, error } = await supabase.functions.invoke('delete-user', {
+      body: {
+        userId: userId,
+        callerId: currentUser.id
+      }
+    });
+
+    if (error) {
+      console.error("Function Error:", error);
+      throw new Error("שגיאה במחיקת משתמש.");
+    }
+
+    if (data && data.error) {
+      throw new Error(data.error);
+    }
+
+    return true;
   } else {
     MOCK_USERS = MOCK_USERS.filter(u => u.id !== userId);
+    return true;
   }
+}
+
+export async function bulkUpdateUsersOrg(userIds, newOrgId) {
+    const currentUser = getCurrentUserSync();
+    if (!currentUser || currentUser.role !== 'super_admin') throw new Error("רק מנהל על רשאי להעביר עובדים בין ארגונים");
+
+    if (!userIds || userIds.length === 0) return true;
+
+    if (supabase) {
+        console.log(`[LMS] Bulk moving ${userIds.length} users to org ${newOrgId}`);
+        
+        // 1. Update Profile (Primary Source)
+        const { error: pError, count: pCount } = await supabase
+            .from('profiles')
+            .update({ org_id: newOrgId }, { count: 'exact' })
+            .in('id', userIds);
+            
+        if (pError) throw new Error(pError.message);
+        console.log(`[LMS] Profile move completed. Rows updated: ${pCount}`);
+
+        if (pCount === 0) {
+            console.warn(`[LMS] No rows were updated in 'profiles'. This may be an RLS issue.`);
+            throw new Error("לא נמצאו רשומות לעדכון או שההרשאות לא מאפשרות עדכון (RLS).");
+        }
+
+        // 2. Denormalized Update: Course Assignments
+        // This ensures the user see those assignments in the new org flow if applicable, 
+        // though typically they should get NEW assignments in the new org.
+        const { error: aError } = await supabase
+            .from('course_assignments')
+            .update({ org_id: newOrgId })
+            .in('user_id', userIds);
+        
+        if (aError) console.warn("[LMS] Course assignments move failed (non-critical):", aError.message);
+
+        // 3. Denormalized Update: Learner Progress
+        // This ensures historical progress appears in the NEW org's reports.
+        const { error: prError } = await supabase
+            .from('learner_progress')
+            .update({ org_id: newOrgId })
+            .in('user_id', userIds);
+            
+        if (prError) console.warn("[LMS] Learner progress move failed (non-critical):", prError.message);
+
+        console.log(`[LMS] Bulk move operation finished successfully.`);
+    } else {
+        userIds.forEach(id => {
+            const user = MOCK_USERS.find(u => u.id === id);
+            if (user) user.org_id = newOrgId;
+        });
+    }
+    return true;
 }

@@ -29,6 +29,11 @@ export async function login(email, password) {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw new Error(error.message);
     const userProfile = await fetchUserProfile(data.user.id);
+    
+    // Update global state for synchronous router checks
+    if (!window.__APP_STATE) window.__APP_STATE = {};
+    window.__APP_STATE.user = userProfile;
+    
     return userProfile;
   } else {
     // Mock Support
@@ -54,31 +59,41 @@ export async function logout() {
     mockCurrentUser = null;
     localStorage.removeItem('mock.auth.token');
   }
+  if (window.__APP_STATE) window.__APP_STATE.user = null;
+  window.location.hash = '#/login';
 }
 
 async function fetchUserProfile(userId) {
   // 1. Fetch the basic profile
-  const { data: profile, error: profileError } = await supabase
+  const { data: profiles, error: profileError } = await supabase
     .from('profiles')
     .select('id, full_name, role, org_id')
-    .eq('id', userId)
-    .single();
+    .eq('id', userId);
 
-  if (profileError || !profile) {
+  if (profileError) {
     console.error("Supabase Profile Fetch Error:", profileError);
     throw new Error('שגיאה בטעינת פרופיל משתמש');
   }
 
-  // 2. Separately fetch organization name to avoid RLS join recursion issues (common cause for 500)
+  // Handle case where profile row doesn't exist yet
+  let profile = profiles && profiles.length > 0 ? profiles[0] : null;
+  
+  if (!profile) {
+    console.error(`[LMS] No profile found for user ${userId}. Deleting session...`);
+    // Optionally log out if no profile exists to keep things clean
+    await supabase.auth.signOut();
+    throw new Error('לא נמצא פרופיל משתמש במערכת. פנה למנהל המערכת.');
+  }
+
+  // 2. Separately fetch organization name
   let orgName = null;
   if (profile.org_id) {
     const { data: orgData } = await supabase
       .from('organizations')
       .select('name')
-      .eq('id', profile.org_id)
-      .single();
+      .eq('id', profile.org_id);
     
-    if (orgData) orgName = orgData.name;
+    if (orgData && orgData.length > 0) orgName = orgData[0].name;
   }
 
   return {
@@ -97,4 +112,30 @@ export function getCurrentUserSync() {
     return window.__APP_STATE?.user || null;
   }
   return mockCurrentUser;
+}
+
+export function onAuthStatusChange(callback) {
+  if (supabase) {
+    return supabase.auth.onAuthStateChange((event, session) => {
+      console.log(`[LMS] Auth event: ${event}`);
+      
+      // Update global state immediately if session exists
+      if (session?.user && !window.__APP_STATE?.user) {
+          console.log("[LMS] Session found, updating app state...");
+          // This will be populated properly by fetchUserProfile in main.js
+      }
+
+      if (event === 'SIGNED_OUT') {
+        // Only redirect if we were actually logged in and now we are not
+        if (window.__APP_STATE?.user && !session) {
+          console.warn("[LMS] Verified sign out, redirecting...");
+          window.__APP_STATE.user = null;
+          if (window.location.hash !== '#/login') {
+            window.location.hash = '#/login';
+          }
+        }
+      }
+      if (callback) callback(event, session);
+    });
+  }
 }

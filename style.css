@@ -185,7 +185,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .password-toggle-btn {
   position: absolute;
-  left: 10px; /* Positioned on the left for LTR input in RTL page */
+  right: 10px; /* Moved to the right for RTL layout */
   top: 50%;
   transform: translateY(-50%);
   color: hsl(var(--text-muted));
@@ -199,8 +199,9 @@ h1, h2, h3, h4, h5, h6 {
   color: hsl(var(--color-primary));
 }
 
-[dir="ltr"] .form-control {
-  padding-left: 2.5rem; /* Make room for the eye icon on the left */
+.form-control[dir="ltr"] {
+  padding-right: 2.5rem; /* Space for icon on the right */
+  padding-left: 1rem;    /* Normal padding on the left */
 }
 
 /* Badges */

@@ -1,23 +1,24 @@
-import { fetchOrgLearners, fetchCourseAssignments, assignCourseToLearner, unassignCourse } from '../api/assignmentApi.js'
+import { fetchCourseAssignments, assignCourseToOrg, unassignCourse } from '../api/assignmentApi.js'
+import { fetchOrganizations } from '../api/orgApi.js'
 import { fetchCourses } from '../api/coursesApi.js'
 
 export default async function renderAdminAssignments(container) {
   
   container.innerHTML = `
     <div class="mb-4 fade-in">
-      <h1 class="mb-1">הקצאת לומדות לעובדים</h1>
-      <p class="text-muted">שיוך וניהול גישה להדרכות עבור העובדים בארגון שלך</p>
+      <h1 class="mb-1">הקצאת לומדות לארגונים</h1>
+      <p class="text-muted">שיוך לומדות מקטלוג המערכת לארגונים השונים</p>
     </div>
 
     <div class="grid grid-cols-3 slide-up" style="gap: 1.5rem; align-items: start;">
        <!-- Form Section -->
        <div class="card" style="grid-column: span 1;">
-         <h3 class="mb-3">ביצוע הקצאה חדשה</h3>
+         <h3 class="mb-3">ביצוע הקצאה חדשת</h3>
          <form id="assignment-form">
             <div class="form-group" style="text-align: right;">
-               <label class="form-label" for="select-learner">בחר לומד <span style="color: hsl(var(--color-danger));">*</span></label>
-               <select class="form-control" id="select-learner" required>
-                  <option value="">טוען לומדים...</option>
+               <label class="form-label" for="select-target">בחר ארגון <span style="color: hsl(var(--color-danger));">*</span></label>
+               <select class="form-control" id="select-target" required>
+                  <option value="">טוען ארגונים...</option>
                </select>
             </div>
             <div class="form-group" style="text-align: right;">
@@ -28,7 +29,7 @@ export default async function renderAdminAssignments(container) {
             </div>
             
             <button type="submit" class="btn btn-primary w-full justify-center mt-4">
-              <i class='bx bx-book-add'></i> הקצה לומדה
+              <i class='bx bx-book-add'></i> הקצה לומדה לארגון
             </button>
             <div id="assignment-msg" style="margin-top: 10px; text-align: center; font-weight: 500; min-height: 20px;" class="text-sm"></div>
          </form>
@@ -36,11 +37,11 @@ export default async function renderAdminAssignments(container) {
 
        <!-- Table Section -->
        <div class="card table-wrapper" style="grid-column: span 2;">
-         <h3 class="mb-3">לומדות שהוקצו ללומדים</h3>
+         <h3 class="mb-3">לומדות שהוקצו לארגונים</h3>
          <table class="table" id="assignments-table">
             <thead>
                <tr>
-                  <th>שם הלומד</th>
+                  <th>שם הארגון</th>
                   <th>לומדה</th>
                   <th>תאריך הקצאה</th>
                   <th>פעולות</th>
@@ -54,28 +55,28 @@ export default async function renderAdminAssignments(container) {
     </div>
   `
 
-  const selectLearner = container.querySelector('#select-learner');
+  const selectTarget = container.querySelector('#select-target');
   const selectCourse = container.querySelector('#select-course');
   const tbody = container.querySelector('#assignments-table tbody');
 
   // Fetch combo boxes data
   async function loadComboBoxes() {
     try {
-        const [learners, courses] = await Promise.all([
-            fetchOrgLearners(),
+        const [targets, courses] = await Promise.all([
+            fetchOrganizations(),
             fetchCourses()
         ]);
         
-        selectLearner.innerHTML = learners.length === 0 
-           ? '<option value="">לא נמצאו עובדים</option>'
-           : `<option value="">-- בחר איש צוות --</option>` + learners.map(l => `<option value="${l.id}">${l.full_name}</option>`).join('');
+        selectTarget.innerHTML = targets.length === 0 
+           ? '<option value="">לא נמצאו ארגונים</option>'
+           : `<option value="">-- בחר ארגון יעד --</option>` + targets.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
            
         selectCourse.innerHTML = courses.length === 0 
-           ? '<option value="">אין לומדות בארגון</option>'
+           ? '<option value="">אין לומדות זמינות</option>'
            : `<option value="">-- בחר הדרכה --</option>` + courses.map(c => `<option value="${c.id}">${c.title}</option>`).join('');
 
     } catch(err) {
-        selectLearner.innerHTML = `<option value="">שגיאה בטעינה</option>`;
+        selectTarget.innerHTML = `<option value="">שגיאה בטעינה</option>`;
         selectCourse.innerHTML = `<option value="">שגיאה בטעינה</option>`;
     }
   }
@@ -91,7 +92,7 @@ export default async function renderAdminAssignments(container) {
 
       tbody.innerHTML = records.map(r => `
         <tr>
-          <td><div style="font-weight: 500;">${r.learner_name || 'נמחק'}</div></td>
+          <td><div style="font-weight: 500;">${r.target_name || 'נמחק'}</div></td>
           <td>${r.course_title || 'נמחק'}</td>
           <td>${r.assigned_at || '-'}</td>
           <td>
@@ -153,24 +154,24 @@ export default async function renderAdminAssignments(container) {
     const btn = form.querySelector('button');
     const msg = document.getElementById('assignment-msg');
     const courseId = selectCourse.value;
-    const learnerId = selectLearner.value;
+    const targetId = selectTarget.value;
 
-    if(!courseId || !learnerId) return;
+    if(!courseId || !targetId) return;
 
     btn.disabled = true;
     btn.innerHTML = `<i class='bx bx-loader-alt bx-spin'></i> שומר...`;
 
     try {
-        await assignCourseToLearner(courseId, learnerId);
+        await assignCourseToOrg(courseId, targetId);
         msg.style.color = 'hsl(var(--color-success))';
-        msg.innerHTML = 'הלומדה שויכה לעובד בהצלחה!';
+        msg.innerHTML = 'הלומדה שויכה לארגון בהצלחה!';
         await renderTable();
     } catch(err) {
         msg.style.color = 'hsl(var(--color-danger))';
         msg.innerHTML = err.message;
     } finally {
         btn.disabled = false;
-        btn.innerHTML = `<i class='bx bx-book-add'></i> הקצה לומדה`;
+        btn.innerHTML = `<i class='bx bx-book-add'></i> הקצה לומדה לארגון`;
         setTimeout(() => msg.innerHTML='', 3000);
     }
   });
